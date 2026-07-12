@@ -1,5 +1,5 @@
 # Term Reading Programme — Backbone Plan
-**Years 5–6 (NZC English, Phase 2) | 1 story per week | 4 lessons/week @ ~50 mins | 11-week term**
+**Years 5–6 (NZC English, Phase 2) | 1 story per week | 4 lessons/week @ ~50 mins | 10-week term**
 
 This is the planning skeleton we'll use to build the app. It defines the weekly rhythm, the day-by-day lesson shape, how each day ties to the NZ Curriculum, and the dropdown structure the app needs. Once you're happy with this, we build the real thing (story-by-story content + the app itself).
 
@@ -23,7 +23,7 @@ This is the planning skeleton we'll use to build the app. It defines the weekly 
 | 10 | Tahu and the Dancing Feathers | Fiction (Connected) | Yr 5/6 | Identity, taonga |
 | 11 | Woven Taonga / Over One, Under One | Non-fiction (Connected) | Yr 5/6 | Weaving, craft, culture |
 
-> **Running as 11 weeks:** all 11 stories get a week each. If the term ends up shorter (e.g. a 10-week term, teacher-only day, assembly week, etc.), you decide on the day which one to drop or push into next term — the app should let you assign/reassign any story to any week freely, so nothing is locked to the order in this table.
+> **Final term running order:** 10 stories, one per week — *Taki Tahi | Over One, Under One* was considered for Week 11 but was ultimately dropped, making this a clean 10-week term. The app assigns any story to any week freely, so the order can still be changed.
 
 ---
 
