@@ -58,9 +58,13 @@
     </p>
   </div>
 
-  <!-- SETUP: choose week -->
+  <!-- SETUP: choose term & week -->
   <div id="view-setup" class="card hidden">
     <h2 style="margin-bottom:1rem">Start a Live Quiz</h2>
+    <div class="field">
+      <label>Term</label>
+      <select id="termSelect"></select>
+    </div>
     <div class="field">
       <label>Week</label>
       <select id="weekSelect"></select>
@@ -162,30 +166,54 @@ let unsubPlayers = null;
 let unsubMeta = null;
 
 // ---------- SETUP VIEW ----------
+const TERM_LABELS = { 1: "Term 1 — Voyaging & Migration", 2: "Term 2 — South Africa & Zimbabwe" };
+const termSelect = document.getElementById("termSelect");
 const weekSelect = document.getElementById("weekSelect");
 const weekPreview = document.getElementById("weekPreview");
 
-for (let w=1; w<=10; w++){
+Object.keys(TERM_LABELS).forEach(t => {
   const o = document.createElement("option");
-  o.value = w; o.textContent = "Week " + w;
-  weekSelect.appendChild(o);
+  o.value = t; o.textContent = TERM_LABELS[t];
+  termSelect.appendChild(o);
+});
+
+function currentTermData(){ return (window.READING_QUIZ_DATA || {})[termSelect.value] || {}; }
+function currentTermTopics(){ return (window.READING_QUIZ_WEEK_TOPICS || {})[termSelect.value] || {}; }
+
+function rebuildWeekSelect(){
+  weekSelect.innerHTML = "";
+  const termData = currentTermData();
+  for (let w=1; w<=10; w++){
+    const o = document.createElement("option");
+    o.value = w;
+    o.textContent = "Week " + w + (termData[String(w)] ? "" : " (no quiz yet)");
+    if (!termData[String(w)]) o.disabled = true;
+    weekSelect.appendChild(o);
+  }
+  // select the first week that actually has quiz data, if any
+  const firstAvailable = Object.keys(termData).sort((a,b)=>Number(a)-Number(b))[0];
+  if (firstAvailable) weekSelect.value = firstAvailable;
+  updatePreview();
 }
+
 function updatePreview(){
   const key = weekSelect.value;
-  const topics = (window.READING_QUIZ_WEEK_TOPICS || {})[key];
-  weekPreview.textContent = topics ? topics.join(" · ") : "";
+  const topics = currentTermTopics()[key];
+  weekPreview.textContent = topics ? topics.join(" · ") : "No quiz has been built for this week yet.";
 }
+termSelect.onchange = rebuildWeekSelect;
 weekSelect.onchange = updatePreview;
-updatePreview();
+rebuildWeekSelect();
 
 document.getElementById("createRoomBtn").onclick = async () => {
+  const term = Number(termSelect.value);
   const week = Number(weekSelect.value);
   const key = String(week);
-  if (!(window.READING_QUIZ_DATA || {})[key]) { alert("No quiz data found for that week."); return; }
+  if (!(currentTermData())[key]) { alert("No quiz data found for that week yet."); return; }
 
   roomCode = genRoomCode();
   await set(ref(db, ROOMS_PATH + "/" + roomCode), {
-    meta: { week, status: "waiting", questionCount: 20, createdAt: Date.now() },
+    meta: { term, week, status: "waiting", questionCount: 20, createdAt: Date.now() },
     players: {}
   });
   enterLobby();

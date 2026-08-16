@@ -193,6 +193,7 @@ footer{margin-top:26px;font-family:'JetBrains Mono',monospace;font-size:11px;col
     <div>
       <div class="brand-eyebrow">Years 5–6 · NZC English Phase 2</div>
       <h1>Te Haerenga <span style="font-weight:400;color:#5a5140;">— Term Reading Voyage</span></h1>
+      <div class="term-subheading" id="termSubheading" style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--teal);font-weight:600;margin-top:4px;letter-spacing:.03em;"></div>
     </div>
     <div class="subtitle">10-week programme<br>1 story per week · ~50 min lessons<br><span class="motto-line" style="display:inline">Soli Deo Gloria — To God Alone the Glory</span></div>
   </header>
@@ -205,6 +206,10 @@ footer{margin-top:26px;font-family:'JetBrains Mono',monospace;font-size:11px;col
   </div>
 
   <div class="controls">
+    <div class="field">
+      <label for="termSelect">Term</label>
+      <select id="termSelect"></select>
+    </div>
     <div class="field">
       <label for="weekSelect">Week</label>
       <select id="weekSelect"></select>
@@ -226,7 +231,7 @@ footer{margin-top:26px;font-family:'JetBrains Mono',monospace;font-size:11px;col
 
   <div class="lesson" id="lessonArea"></div>
 
-  <footer>Te Haerenga · built around the term's 11 voyaging &amp; migration texts</footer>
+  <footer id="pageFooter">Te Haerenga · built around the term's 11 voyaging &amp; migration texts</footer>
 </div>
 
 <div class="overlay" id="planOverlay">
@@ -269,8 +274,10 @@ footer{margin-top:26px;font-family:'JetBrains Mono',monospace;font-size:11px;col
 </div>
 
 <script>
-  // Central registry that each week's data file (data/week-NN-*.js) fills in.
-  // Populated before any week data files load, so they can safely push/assign into it.
+  // Central registry that each week's data file (data/week-NN-*.js / data/term2-week-NN-*.js)
+  // fills in. Populated before any week data files load, so they can safely push/assign into
+  // it. Term 1's files load into this object, then we snapshot it into TERM_DATA[1] and reset
+  // WEEK_DATA before loading Term 2's files, so no existing data file needs to change.
   window.WEEK_DATA = { weeks: [], lessonPlans: {}, worksheets: {}, projectGuides: {} };
 </script>
 <script src="data/week-01-the-journey.js"></script>
@@ -283,6 +290,29 @@ footer{margin-top:26px;font-family:'JetBrains Mono',monospace;font-size:11px;col
 <script src="data/week-08-kuaka-the-marathon-bird.js"></script>
 <script src="data/week-09-te-ra-the-last-of-its-kind.js"></script>
 <script src="data/week-10-tahu-and-the-dancing-feathers.js"></script>
+<script>
+  window.TERM_DATA = {};
+  window.TERM_DATA[1] = window.WEEK_DATA;
+  window.WEEK_DATA = { weeks: [], lessonPlans: {}, worksheets: {}, projectGuides: {} };
+</script>
+<script src="data/term2-week-01-old-woman-and-her-pig.js"></script>
+<script src="data/term2-week-02-south-africa-zimbabwe-journey-through-time.js"></script>
+<script src="data/term2-week-03-the-small-seed.js"></script>
+<script src="data/term2-week-04-a-bowl-of-phutu.js"></script>
+<script src="data/term2-week-05-storm.js"></script>
+<script src="data/term2-week-06-the-boerewors-man.js"></script>
+<script src="data/term2-week-07-sisandas-gift.js"></script>
+<script src="data/term2-week-08-wolfs-supper.js"></script>
+<script src="data/term2-week-09-why-crocodile-lives-in-the-river.js"></script>
+<script src="data/term2-week-10-nelson-mandela-long-walk-to-freedom.js"></script>
+<script>
+  window.TERM_DATA[2] = window.WEEK_DATA;
+
+  window.TERM_META = {
+    1: { label: "Term 1 — Voyaging & Migration", pdfPrefix: "", footer: "Te Haerenga · built around the term's 11 voyaging & migration texts" },
+    2: { label: "Term 2 — South Africa & Zimbabwe", pdfPrefix: "", footer: "Te Haerenga · built around this term's South African & Zimbabwean stories" }
+  };
+</script>
 
 <script>
 const DAY_META = {
@@ -295,14 +325,15 @@ const DAY_META = {
 
 const PDF_BASE_URL = "https://pub-c9d54ec1efa04cfeaa3041eebb9144db.r2.dev";
 
-
-const weeks = WEEK_DATA.weeks;
+let currentTerm = 1;
+let WEEK_DATA = window.TERM_DATA[currentTerm];
+let weeks = WEEK_DATA.weeks;
 
 
 let currentWeek = 1;
 let currentDay = 'mon';
 
-const lessonPlans = WEEK_DATA.lessonPlans;
+let lessonPlans = WEEK_DATA.lessonPlans;
 
 
 function planSection(title, html){ return `<div class="plan-block"><h3>${title}</h3>${html}</div>`; }
@@ -374,7 +405,7 @@ function closePlan(){
 
 const QUIET_NOTE = "Quiet, independent work — your teacher is reading with another group and needs it calm to hear them. Work on your own, or quietly with your partner.";
 
-const worksheets = WEEK_DATA.worksheets;
+let worksheets = WEEK_DATA.worksheets;
 
 
 function renderWorksheet(week, day, key){
@@ -437,7 +468,7 @@ function closeWorksheet(){
   document.body.classList.remove('worksheet-open');
 }
 
-const projectGuides = WEEK_DATA.projectGuides;
+let projectGuides = WEEK_DATA.projectGuides;
 
 
 function renderProject(week, idx){
@@ -467,10 +498,22 @@ function closeProject(){
 
 
 const track = document.getElementById('track');
+const termSelect = document.getElementById('termSelect');
 const weekSelect = document.getElementById('weekSelect');
 const daySelect = document.getElementById('daySelect');
 
+function buildTermSelect(){
+  Object.keys(window.TERM_META).forEach(t=>{
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = window.TERM_META[t].label;
+    termSelect.appendChild(opt);
+  });
+  termSelect.value = currentTerm;
+}
+
 function buildTrack(){
+  track.querySelectorAll('.stop').forEach(el=>el.remove());
   weeks.forEach(w=>{
     const stop = document.createElement('div');
     stop.className = 'stop' + (w.n===currentWeek ? ' active':'');
@@ -482,6 +525,7 @@ function buildTrack(){
 }
 
 function buildWeekSelect(){
+  weekSelect.innerHTML = '';
   weeks.forEach(w=>{
     const opt = document.createElement('option');
     opt.value = w.n;
@@ -511,6 +555,28 @@ function sectionHTML(sec, weekNum){
     inner = '<div class="project-list">' + sec.items.map((i,idx)=>`<div class="project-card" onclick="openProject(${weekNum},${idx})" style="cursor:pointer;"><div>${i}</div><button class="ws-btn" onclick="event.stopPropagation();openProject(${weekNum},${idx})">📋 View full instructions</button></div>`).join('') + '</div>';
   }
   return `<div class="section"><h3>${sec.h}</h3>${inner}</div>`;
+}
+
+function updateChromeForTerm(){
+  const meta = window.TERM_META[currentTerm];
+  document.getElementById('termSubheading').textContent = meta.label;
+  document.getElementById('pageFooter').textContent = meta.footer;
+}
+
+function switchTerm(term){
+  currentTerm = term;
+  WEEK_DATA = window.TERM_DATA[currentTerm];
+  weeks = WEEK_DATA.weeks;
+  lessonPlans = WEEK_DATA.lessonPlans;
+  worksheets = WEEK_DATA.worksheets;
+  projectGuides = WEEK_DATA.projectGuides;
+  currentWeek = 1;
+  currentDay = 'mon';
+  daySelect.value = 'mon';
+  updateChromeForTerm();
+  buildWeekSelect();
+  buildTrack();
+  render();
 }
 
 function render(){
@@ -580,9 +646,12 @@ function render(){
     </div>`;
 }
 
+buildTermSelect();
 buildTrack();
 buildWeekSelect();
+updateChromeForTerm();
 
+termSelect.addEventListener('change', e=>{ switchTerm(Number(e.target.value)); });
 weekSelect.addEventListener('change', e=>{ currentWeek = Number(e.target.value); render(); });
 daySelect.addEventListener('change', e=>{ currentDay = e.target.value; render(); });
 

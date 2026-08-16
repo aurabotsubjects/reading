@@ -162,6 +162,7 @@ let roomCode = (params.get("room") || "").toUpperCase();
 let playerId = null;
 let selectedTeam = null;
 let quizKey = null;      // week number as string
+let termKey = "1";       // term number as string (defaults to Term 1 for older rooms)
 let questions = null;    // shuffled-per-player option order, fixed question order
 let roomMetaUnsub = null;
 
@@ -220,13 +221,14 @@ async function attemptJoin(){
 
   roomCode = code;
   quizKey = String(meta.week);
+  termKey = String(meta.term || 1);
   playerId = "p" + Date.now() + Math.random().toString(36).slice(2,8);
 
   await set(ref(db, ROOMS_PATH + "/" + roomCode + "/players/" + playerId), {
     name, team: selectedTeam, score: 0, questionIndex: 0, finished: false, joinedAt: Date.now()
   });
 
-  localStorage.setItem(storageKey(roomCode), JSON.stringify({ playerId, quizKey }));
+  localStorage.setItem(storageKey(roomCode), JSON.stringify({ playerId, quizKey, termKey }));
   enterWaiting();
 }
 
@@ -241,6 +243,7 @@ async function resumeSession(player){
   if (!metaSnap.exists()) { localStorage.removeItem(storageKey(roomCode)); show("view-join"); init(); return; }
   const meta = metaSnap.val();
   quizKey = String(meta.week);
+  termKey = String(meta.term || 1);
 
   if (meta.status === "waiting") enterWaiting();
   else if (meta.status === "finished") enterResults();
@@ -270,7 +273,7 @@ function enterWaiting(){
 
 // ---------- QUESTION FLOW ----------
 function buildQuestions(){
-  const raw = (window.READING_QUIZ_DATA || {})[quizKey] || [];
+  const raw = ((window.READING_QUIZ_DATA || {})[termKey] || {})[quizKey] || [];
   return raw.map(q => {
     const opts = q.options.map((text, i) => ({ text, isCorrect: i === q.correct }));
     for (let i = opts.length-1; i>0; i--){
