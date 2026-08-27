@@ -208,15 +208,15 @@ footer{margin-top:26px;font-family:'JetBrains Mono',monospace;font-size:11px;col
   <div class="controls">
     <div class="field">
       <label for="termSelect">Term</label>
-      <select id="termSelect" autocomplete="off"></select>
+      <select id="termSelect"></select>
     </div>
     <div class="field">
       <label for="weekSelect">Week</label>
-      <select id="weekSelect" autocomplete="off"></select>
+      <select id="weekSelect"></select>
     </div>
     <div class="field">
       <label for="daySelect">Day</label>
-      <select id="daySelect" autocomplete="off">
+      <select id="daySelect">
         <option value="mon">Monday</option>
         <option value="tue">Tuesday</option>
         <option value="wed">Wednesday</option>
@@ -519,7 +519,7 @@ function buildTrack(){
     stop.className = 'stop' + (w.n===currentWeek ? ' active':'');
     stop.dataset.week = w.n;
     stop.innerHTML = `${w.n===currentWeek ? '<div class="bird">🐦</div>':''}<div class="dot"></div><div class="wk">Wk ${w.n}</div><div class="title">${w.title}</div>`;
-    stop.addEventListener('click', ()=>{ currentWeek = w.n; weekSelect.value = w.n; render(); writeStateToHash(); });
+    stop.addEventListener('click', ()=>{ currentWeek = w.n; weekSelect.value = w.n; render(); });
     track.appendChild(stop);
   });
 }
@@ -563,54 +563,20 @@ function updateChromeForTerm(){
   document.getElementById('pageFooter').textContent = meta.footer;
 }
 
-// --- state ---------------------------------------------------------------
-// currentTerm / currentWeek / currentDay are the single source of truth.
-// setState() re-points every data reference, repaints the dropdowns AND the
-// content together, and writes the state into the URL hash, so a reload,
-// bookmark or back/forward can never leave the dropdowns showing one term
-// while the lesson area shows another.
-function setState(next){
-  const wantTerm = Number(next && next.term);
-  currentTerm = window.TERM_DATA[wantTerm] ? wantTerm : currentTerm;
-
+function switchTerm(term){
+  currentTerm = term;
   WEEK_DATA = window.TERM_DATA[currentTerm];
   weeks = WEEK_DATA.weeks;
   lessonPlans = WEEK_DATA.lessonPlans;
   worksheets = WEEK_DATA.worksheets;
   projectGuides = WEEK_DATA.projectGuides;
-
-  const wantWeek = Number(next && next.week);
-  currentWeek = weeks.some(w=>w.n===wantWeek) ? wantWeek : (weeks[0] ? weeks[0].n : 1);
-
-  const wantDay = next && next.day;
-  currentDay = DAY_META[wantDay] ? wantDay : 'mon';
-
-  termSelect.value = String(currentTerm);
-  daySelect.value = currentDay;
+  currentWeek = 1;
+  currentDay = 'mon';
+  daySelect.value = 'mon';
   updateChromeForTerm();
   buildWeekSelect();
   buildTrack();
   render();
-  writeStateToHash();
-}
-
-function switchTerm(term){
-  setState({ term: term, week: 1, day: 'mon' });
-}
-
-function readStateFromHash(){
-  const raw = (location.hash || '').replace(/^#/, '');
-  if(!raw) return null;
-  const p = new URLSearchParams(raw);
-  if(!p.has('term') && !p.has('week') && !p.has('day')) return null;
-  return { term: Number(p.get('term')), week: Number(p.get('week')), day: p.get('day') };
-}
-
-function writeStateToHash(){
-  const h = 'term=' + currentTerm + '&week=' + currentWeek + '&day=' + currentDay;
-  if((location.hash || '').replace(/^#/, '') !== h){
-    history.replaceState(null, '', '#' + h);
-  }
 }
 
 function render(){
@@ -625,13 +591,9 @@ function render(){
     }
   });
 
+  const week = weeks.find(w=>w.n===currentWeek);
   const meta = DAY_META[currentDay];
   const area = document.getElementById('lessonArea');
-  const week = weeks.find(w=>w.n===currentWeek) || weeks[0];
-  if(!week){
-    area.innerHTML = `<div class="empty"><div class="glyph">\u26a0\ufe0f</div><h3>This term's data didn't load</h3><p>Try a hard refresh (Ctrl/Cmd + Shift + R). If it keeps happening, one of this term's data files under <code>data/</code> may be missing from the deploy.</p></div>`;
-    return;
-  }
 
   const dlBtn = document.getElementById('downloadReadingBtn');
   if(week.pdfFile){
@@ -685,29 +647,15 @@ function render(){
 }
 
 buildTermSelect();
+buildTrack();
+buildWeekSelect();
+updateChromeForTerm();
 
 termSelect.addEventListener('change', e=>{ switchTerm(Number(e.target.value)); });
-weekSelect.addEventListener('change', e=>{ currentWeek = Number(e.target.value); render(); writeStateToHash(); });
-daySelect.addEventListener('change', e=>{ currentDay = e.target.value; render(); writeStateToHash(); });
+weekSelect.addEventListener('change', e=>{ currentWeek = Number(e.target.value); render(); });
+daySelect.addEventListener('change', e=>{ currentDay = e.target.value; render(); });
 
-// If someone edits the hash or uses back/forward, re-apply it in full.
-window.addEventListener('hashchange', ()=>{
-  const s = readStateFromHash();
-  if(s) setState({ term: s.term || currentTerm, week: s.week || currentWeek, day: s.day || currentDay });
-});
-
-// Restoring from the back/forward cache: repaint from our own state, never
-// from whatever values the browser put back into the dropdowns.
-window.addEventListener('pageshow', e=>{
-  if(e.persisted) setState({ term: currentTerm, week: currentWeek, day: currentDay });
-});
-
-Object.keys(window.TERM_DATA).forEach(t=>{
-  if(!window.TERM_DATA[t].weeks.length) console.warn('[Te Haerenga] No week data loaded for term ' + t + ' - check the files under data/ are deployed.');
-});
-
-const initial = readStateFromHash() || { term: 1, week: 1, day: 'mon' };
-setState(initial);
+render();
 </script>
 </body>
 </html>
