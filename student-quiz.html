@@ -127,6 +127,11 @@
     <div class="winner-banner" style="margin-top:1.5rem" id="winnerBanner"></div>
     <p class="center muted" id="winnerSub"></p>
     <div class="team-final" id="teamFinalBoxes"></div>
+
+    <div id="favoriteSection" class="hidden" style="margin-top:1.5rem">
+      <h3 class="center muted" style="font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem">📖 Most Popular Story</h3>
+      <div id="favoriteList" style="display:flex;flex-direction:column;gap:.4rem"></div>
+    </div>
   </div>
 </div>
 
@@ -275,6 +280,11 @@ function enterWaiting(){
 function buildQuestions(){
   const raw = ((window.READING_QUIZ_DATA || {})[termKey] || {})[quizKey] || [];
   return raw.map(q => {
+    if (q.type === "favorite") {
+      // Unscored bonus question — options are story titles, kept in order,
+      // no correct answer to shuffle around.
+      return { q: q.q, type: "favorite", options: q.options.map(text => ({ text })) };
+    }
     const opts = q.options.map((text, i) => ({ text, isCorrect: i === q.correct }));
     for (let i = opts.length-1; i>0; i--){
       const j = Math.floor(Math.random()*(i+1));
@@ -312,23 +322,38 @@ function renderQuestion(index){
 
   answered = false;
   document.getElementById("pointsToast").classList.add("hidden");
-  document.getElementById("qCounter").textContent = `Question ${index+1} / ${questions.length}`;
-  document.getElementById("qText").textContent = questions[index].q;
+  const q = questions[index];
+  const isFavorite = q.type === "favorite";
+  document.getElementById("qCounter").textContent = isFavorite ? "🌟 Bonus question" : `Question ${index+1} / ${questions.length}`;
+  document.getElementById("qText").textContent = q.q;
 
   const grid = document.getElementById("optGrid");
   grid.innerHTML = "";
+  grid.style.gridTemplateColumns = isFavorite ? "1fr" : "1fr 1fr";
   const letters = ["A","B","C","D"];
-  questions[index].options.forEach((opt, i) => {
+  q.options.forEach((opt, i) => {
     const btn = document.createElement("button");
     btn.className = "opt-btn";
-    btn.innerHTML = `<span class="opt-letter">${letters[i]}</span><span>${opt.text}</span>`;
-    btn.onclick = () => submitAnswer(index, i, btn);
+    btn.innerHTML = `<span class="opt-letter">${isFavorite ? "☐" : letters[i]}</span><span>${opt.text}</span>`;
+    btn.onclick = () => isFavorite ? submitFavorite(index, i, btn) : submitAnswer(index, i, btn);
     grid.appendChild(btn);
   });
 
+  const timerWrap = document.getElementById("timerBar").parentElement;
+  const num = document.getElementById("qTimerNum");
+
+  if (isFavorite){
+    // Unscored — no countdown pressure, just wait for their tap.
+    cancelTimers();
+    timerWrap.style.visibility = "hidden";
+    num.style.visibility = "hidden";
+    return;
+  }
+  timerWrap.style.visibility = "visible";
+  num.style.visibility = "visible";
+
   qStartTime = performance.now();
   const bar = document.getElementById("timerBar");
-  const num = document.getElementById("qTimerNum");
   bar.style.background = "var(--gold)";
 
   cancelTimers();
@@ -343,6 +368,42 @@ function renderQuestion(index){
   }
   qTimerRAF = requestAnimationFrame(tick);
   qHardTimeout = setTimeout(() => { if (!answered) submitAnswer(index, -1, null); }, QUESTION_TIME*1000 + 50);
+}
+
+async function submitFavorite(index, choiceIdx, btnEl){
+  if (answered) return;
+  answered = true;
+  cancelTimers();
+
+  const opts = questions[index].options;
+  const storyTitle = opts[choiceIdx].text;
+
+  const grid = document.getElementById("optGrid");
+  [...grid.children].forEach((el, i) => {
+    el.disabled = true;
+    if (i === choiceIdx){
+      el.classList.add("correct");
+      const letterEl = el.querySelector(".opt-letter");
+      if (letterEl) letterEl.textContent = "☑";
+    }
+  });
+  flash("correct");
+  const toast = document.getElementById("pointsToast");
+  toast.textContent = "Thanks for voting! 🌟";
+  toast.className = "points-toast earn";
+  toast.classList.remove("hidden");
+
+  const newIndex = index + 1;
+  const finished = newIndex >= questions.length;
+
+  update(ref(db, ROOMS_PATH + "/" + roomCode + "/players/" + playerId), {
+    favoriteStory: storyTitle, questionIndex: newIndex, finished, lastUpdate: Date.now()
+  });
+
+  setTimeout(() => {
+    if (finished) { finishQuiz(); }
+    else renderQuestion(newIndex);
+  }, 1100);
 }
 
 function cancelTimers(){
@@ -456,6 +517,23 @@ async function enterResults(){
       <div style="font-family:var(--font-display);font-size:1.8rem;color:${t.color};margin-top:.3rem">${t.total}</div>`;
     teamBoxes.appendChild(div);
   });
+
+  // Favourite-story tally — only present when this quiz included the bonus
+  // "favorite" question (i.e. a Final Quiz).
+  const favoriteCounts = {};
+  list.forEach(p => { if (p.favoriteStory) favoriteCounts[p.favoriteStory] = (favoriteCounts[p.favoriteStory]||0) + 1; });
+  const favEntries = Object.entries(favoriteCounts).sort((a,b) => b[1]-a[1]).slice(0,3);
+  const favSection = document.getElementById("favoriteSection");
+  if (favEntries.length){
+    favSection.classList.remove("hidden");
+    const medals = ["🥇","🥈","🥉"];
+    document.getElementById("favoriteList").innerHTML = favEntries.map(([title, count], i) =>
+      `<div style="display:flex;justify-content:space-between;gap:.5rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem">
+         <span>${medals[i]} ${title}</span><span class="muted">${count} vote${count===1?"":"s"}</span>
+       </div>`).join("");
+  } else {
+    favSection.classList.add("hidden");
+  }
 
   localStorage.removeItem(storageKey(roomCode));
 }

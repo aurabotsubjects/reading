@@ -122,6 +122,11 @@
     <h3 class="center" style="margin:1.75rem 0 0;font-size:1.1rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)">Top Students</h3>
     <div class="podium" id="podium"></div>
 
+    <div id="favoriteSection" class="hidden">
+      <h3 class="center" style="margin:1.75rem 0 0;font-size:1.1rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)">📖 Most Popular Story</h3>
+      <div class="podium" id="favoritePodium"></div>
+    </div>
+
     <button class="btn" id="newQuizBtn" style="width:100%;margin-top:1rem">New Quiz →</button>
   </div>
 </div>
@@ -190,8 +195,19 @@ function rebuildWeekSelect(){
     if (!termData[String(w)]) o.disabled = true;
     weekSelect.appendChild(o);
   }
+  // special cumulative Final Quiz option, drawing 10 questions from each week
+  const finalOpt = document.createElement("option");
+  finalOpt.value = "final";
+  const finalArr = termData["final"] || [];
+  const finalScored = finalArr.filter(q => q.type !== "favorite").length;
+  const finalHasFavorite = finalArr.some(q => q.type === "favorite");
+  finalOpt.textContent = finalArr.length
+    ? `🏆 Final Quiz — all 10 weeks (${finalScored} Qs${finalHasFavorite ? " + favourite story" : ""})`
+    : "🏆 Final Quiz (not built yet)";
+  if (!finalArr.length) finalOpt.disabled = true;
+  weekSelect.appendChild(finalOpt);
   // select the first week that actually has quiz data, if any
-  const firstAvailable = Object.keys(termData).sort((a,b)=>Number(a)-Number(b))[0];
+  const firstAvailable = Object.keys(termData).filter(k=>k!=="final").sort((a,b)=>Number(a)-Number(b))[0];
   if (firstAvailable) weekSelect.value = firstAvailable;
   updatePreview();
 }
@@ -207,13 +223,15 @@ rebuildWeekSelect();
 
 document.getElementById("createRoomBtn").onclick = async () => {
   const term = Number(termSelect.value);
-  const week = Number(weekSelect.value);
+  const weekRaw = weekSelect.value;
+  const week = weekRaw === "final" ? "final" : Number(weekRaw);
   const key = String(week);
-  if (!(currentTermData())[key]) { alert("No quiz data found for that week yet."); return; }
+  const questions = (currentTermData())[key];
+  if (!questions || !questions.length) { alert("No quiz data found for that week yet."); return; }
 
   roomCode = genRoomCode();
   await set(ref(db, ROOMS_PATH + "/" + roomCode), {
-    meta: { term, week, status: "waiting", questionCount: 20, createdAt: Date.now() },
+    meta: { term, week, status: "waiting", questionCount: questions.length, createdAt: Date.now() },
     players: {}
   });
   enterLobby();
@@ -364,6 +382,28 @@ function renderResults(players){
     podium.appendChild(div);
   });
   if (top3.length === 0) podium.innerHTML = '<p class="muted center">No students joined this round.</p>';
+
+  // Favourite-story tally — only present when this room's quiz included the
+  // bonus "favorite" question (i.e. a Final Quiz), so hide it otherwise.
+  const favoriteCounts = {};
+  list.forEach(p => { if (p.favoriteStory) favoriteCounts[p.favoriteStory] = (favoriteCounts[p.favoriteStory]||0) + 1; });
+  const favoriteEntries = Object.entries(favoriteCounts).sort((a,b) => b[1]-a[1]);
+  const favSection = document.getElementById("favoriteSection");
+  if (favoriteEntries.length){
+    favSection.classList.remove("hidden");
+    const favPodium = document.getElementById("favoritePodium");
+    favPodium.innerHTML = "";
+    favoriteEntries.slice(0,3).forEach(([title, count], i) => {
+      const div = document.createElement("div");
+      div.className = "podium-item p" + (i+1);
+      div.innerHTML = `<div class="podium-medal">${medals[i]}</div>
+        <div class="podium-name">${title}</div>
+        <div class="podium-score">${count} vote${count===1?"":"s"}</div>`;
+      favPodium.appendChild(div);
+    });
+  } else {
+    favSection.classList.add("hidden");
+  }
 }
 
 document.getElementById("newQuizBtn").onclick = () => {
